@@ -1,0 +1,3 @@
+CREATE TABLE TEST (
+  value INT PRIMARY KEY
+);

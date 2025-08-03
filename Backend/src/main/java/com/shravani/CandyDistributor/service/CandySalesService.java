@@ -1,0 +1,168 @@
+package com.shravani.CandyDistributor.service;
+
+import com.shravani.CandyDistributor.dto.CandySalesDTO;
+import com.shravani.CandyDistributor.dto.ProductSalesDTO;
+import com.shravani.CandyDistributor.dto.RegionSalesDTO;
+import com.shravani.CandyDistributor.exception.ResourceNotFoundException;
+import com.shravani.CandyDistributor.model.CandySales;
+import com.shravani.CandyDistributor.repository.CandySalesRepository;
+import jakarta.persistence.criteria.Predicate;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class CandySalesService {
+    private final CandySalesRepository repository;
+
+    public Page<CandySalesDTO> getAllSales(String search, String region, Date startDate, Date endDate, Pageable pageable) {
+        Specification<CandySales> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (search != null && !search.trim().isEmpty()) {
+                String likePattern = "%" + search.toLowerCase() + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("orderId")), likePattern),
+                        cb.like(cb.lower(root.get("shipMode")), likePattern),
+                        cb.like(cb.lower(root.get("customerId")), likePattern),
+                        cb.like(cb.lower(root.get("countryRegion")), likePattern),
+                        cb.like(cb.lower(root.get("city")), likePattern),
+                        cb.like(cb.lower(root.get("stateProvince")), likePattern),
+                        cb.like(cb.lower(root.get("postalCode")), likePattern),
+                        cb.like(cb.lower(root.get("division")), likePattern),
+                        cb.like(cb.lower(root.get("region")), likePattern),
+                        cb.like(cb.lower(root.get("productId")), likePattern),
+                        cb.like(cb.lower(root.get("productName")), likePattern)
+                        // Add more fields here if you want to include them in the general search
+                ));
+            }
+
+            if (region != null && !region.trim().isEmpty()) {
+                predicates.add(cb.equal(root.get("region"), region));
+            }
+
+            if (startDate != null && endDate != null) {
+                predicates.add(cb.between(root.get("orderDate"), startDate, endDate));
+            } else if (startDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("orderDate"), startDate));
+            } else if (endDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("orderDate"), endDate));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return repository.findAll(spec, pageable).map(this::convertToDTO);
+    }
+
+
+    public CandySalesDTO getSaleById(Integer salesId) {
+        CandySales sale = repository.findById(salesId)
+                .orElseThrow(() -> new RuntimeException("Sale not found"));
+        return convertToDTO(sale);
+    }
+
+    public CandySalesDTO createSale(CandySalesDTO dto) {
+        CandySales sale = convertToEntity(dto); // salesId will be null here
+        CandySales saved = repository.save(sale); // Database generates salesId
+        return convertToDTO(saved); // Convert saved entity (with generated ID) to DTO
+    }
+
+    public void deleteSale(Integer salesId) {
+        repository.deleteById(salesId);
+    }
+
+    // Manual mapping methods:
+
+    private CandySalesDTO convertToDTO(CandySales entity) {
+        CandySalesDTO dto = new CandySalesDTO();
+        dto.setSalesId(entity.getSalesId()); // This is correct for converting entity to DTO
+        dto.setOrderId(entity.getOrderId());
+        dto.setSales(entity.getSales());
+        dto.setOrderDate(entity.getOrderDate());
+        dto.setShipDate(entity.getShipDate());
+        dto.setShipMode(entity.getShipMode());
+        dto.setCustomerId(entity.getCustomerId());
+        dto.setCountryRegion(entity.getCountryRegion());
+        dto.setCity(entity.getCity());
+        dto.setStateProvince(entity.getStateProvince());
+        dto.setPostalCode(entity.getPostalCode());
+        dto.setDivision(entity.getDivision());
+        dto.setRegion(entity.getRegion());
+        dto.setProductId(entity.getProductId());
+        dto.setProductName(entity.getProductName());
+        dto.setSales(entity.getSales());
+        dto.setUnits(entity.getUnits());
+        dto.setGrossProfit(entity.getGrossProfit());
+        dto.setCost(entity.getCost());
+        return dto;
+    }
+
+    private CandySales convertToEntity(CandySalesDTO dto) {
+        CandySales entity = new CandySales();
+        // salesId should NOT be set here for creation, as it's usually auto-generated by the DB
+        // For updates, it's handled in the updateSale method.
+        // entity.setSalesId(dto.getSalesId()); // REMOVE OR COMMENT OUT THIS LINE FOR CREATION
+        entity.setOrderId(dto.getOrderId());
+        entity.setSales(dto.getSales());
+        entity.setOrderDate(dto.getOrderDate());
+        entity.setShipDate(dto.getShipDate());
+        entity.setShipMode(dto.getShipMode());
+        entity.setCustomerId(dto.getCustomerId());
+        entity.setCountryRegion(dto.getCountryRegion());
+        entity.setCity(dto.getCity());
+        entity.setStateProvince(dto.getStateProvince());
+        entity.setPostalCode(dto.getPostalCode());
+        entity.setDivision(dto.getDivision());
+        entity.setRegion(dto.getRegion());
+        entity.setProductId(dto.getProductId());
+        entity.setProductName(dto.getProductName());
+        entity.setSales(dto.getSales());
+        entity.setUnits(dto.getUnits());
+        entity.setGrossProfit(dto.getGrossProfit());
+        entity.setCost(dto.getCost());
+        return entity;
+    }
+
+    public CandySalesDTO updateSale(CandySalesDTO dto) {
+        CandySales existing = repository.findById(dto.getSalesId()).orElseThrow(() -> new ResourceNotFoundException("Sale not found"));
+        // For update, salesId from DTO is used to find the existing entity
+        // and then other fields are updated.
+        existing.setOrderId(dto.getOrderId()); // Make sure orderId is also updated if needed
+        existing.setSales(dto.getSales());
+        existing.setOrderDate(dto.getOrderDate());
+        existing.setShipDate(dto.getShipDate());
+        existing.setShipMode(dto.getShipMode());
+        existing.setCustomerId(dto.getCustomerId());
+        existing.setCountryRegion(dto.getCountryRegion());
+        existing.setCity(dto.getCity());
+        existing.setStateProvince(dto.getStateProvince());
+        existing.setPostalCode(dto.getPostalCode());
+        existing.setDivision(dto.getDivision());
+        existing.setRegion(dto.getRegion());
+        existing.setProductId(dto.getProductId());
+        existing.setProductName(dto.getProductName());
+        existing.setSales(dto.getSales());
+        existing.setUnits(dto.getUnits());
+        existing.setGrossProfit(dto.getGrossProfit());
+        existing.setCost(dto.getCost());
+        repository.save(existing);
+        return convertToDTO(existing);
+    }
+
+    public List<RegionSalesDTO> getTotalSalesByRegion() {
+        return repository.getTotalSalesByRegion();
+    }
+
+    public List<ProductSalesDTO> getTotalSalesByProductInRange(Date start, Date end) {
+        return repository.getTotalSalesByProductInRange(start, end);
+
+    }
+}
